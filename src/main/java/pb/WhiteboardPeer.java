@@ -1,6 +1,7 @@
 package pb;
 
 
+import java.net.UnknownHostException;
 import java.util.logging.Logger;
 
 import org.apache.commons.cli.CommandLine;
@@ -19,12 +20,13 @@ import pb.utils.Utils;
  *
  */
 public class WhiteboardPeer {
-	private static Logger log = Logger.getLogger(WhiteboardPeer.class.getName());
+
+	private static final Logger log = Logger.getLogger(WhiteboardPeer.class.getName());
 
 	/**
 	 * port to use for this peer's server
 	 */
-	private static int peerPort=Utils.serverPort; // default port number for this peer's server
+	private static int peerPort = Utils.serverPort; // default port number for this peer's server
 	
 	
 	/**
@@ -39,7 +41,7 @@ public class WhiteboardPeer {
 	
 	/**
 	 * Print some help.
-	 * @param options
+	 * @param options options
 	 */
 	private static void help(Options options){
 		String header = "Whiteboard Peer for Unimelb COMP90015\n\n";
@@ -49,7 +51,7 @@ public class WhiteboardPeer {
 		System.exit(-1);
 	}
 	
-	public static void main(String[] args) {
+	public static void main(String[] args) throws InterruptedException, UnknownHostException {
 		// set a nice log format
 		System.setProperty("java.util.logging.SimpleFormatter.format",
                 "[%1$tl:%1$tM:%1$tS:%1$tL] %2$s %4$s: %5$s%n");
@@ -62,15 +64,16 @@ public class WhiteboardPeer {
         CommandLineParser parser = new DefaultParser();
         CommandLine cmd = null;
         try {
-			cmd = parser.parse( options, args);
+			cmd = parser.parse(options, args);
 		} catch (ParseException e1) {
 			help(options);
 		}
-        
-        if(cmd.hasOption("port")){
+
+		assert cmd != null;
+		if(cmd.hasOption("port")){
         	try{
         		peerPort = Integer.parseInt(cmd.getOptionValue("port"));
-			} catch (NumberFormatException e){
+			} catch (NumberFormatException e) {
 				System.out.println("-port requires a port number, parsed: "+
 						cmd.getOptionValue("port"));
 				help(options);
@@ -91,7 +94,7 @@ public class WhiteboardPeer {
         	host = cmd.getOptionValue("host");
         }
         
-		WhiteboardApp whiteboard = new WhiteboardApp(peerPort,host,whiteboardServerPort);
+		WhiteboardApp whiteboard = new WhiteboardApp(peerPort, host, whiteboardServerPort);
 		whiteboard.waitToFinish();
 		Utils.getInstance().cleanUp();
 	}

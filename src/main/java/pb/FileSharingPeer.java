@@ -12,6 +12,7 @@ import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -89,12 +90,12 @@ public class FileSharingPeer {
 	/**
 	 * host to use when contacting the index server
 	 */
-	private static String host=Utils.serverHost; // default host for the index server
+	private static String host = Utils.serverHost; // default host for the index server
 	
 	/**
 	 * chunk size to use (bytes) when transferring a file
 	 */
-	private static int chunkSize=Utils.chunkSize;
+	private static int chunkSize = Utils.chunkSize;
 	
 	/**
 	 * buffer for file reading
@@ -213,10 +214,8 @@ public class FileSharingPeer {
 	 * @throws IOException 
 	 */
 	private static void shareFiles(String[] files) throws InterruptedException, IOException {
-		List<String> filenames=new ArrayList<String>();
-		for(String file : files) {
-			filenames.add(file);
-		}
+		List<String> filenames = new ArrayList<>();
+		Collections.addAll(filenames, files);
         PeerManager peerManager = new PeerManager(peerPort);
         peerManager.on(PeerManager.peerStarted, (args)->{
         	Endpoint endpoint = (Endpoint)args[0];
@@ -238,7 +237,7 @@ public class FileSharingPeer {
         	serverManager.on(IOThread.ioThread, (args2)->{
 	        	String peerport = (String) args2[0];
 	        	try {
-					uploadFileList(filenames,peerManager,peerport);
+					uploadFileList(filenames, peerManager, peerport);
 				} catch (UnknownHostException e) {
 					System.out.println("The index server host could not be found: "+host);
 				} catch (InterruptedException e) {
@@ -378,7 +377,7 @@ public class FileSharingPeer {
 		System.exit(-1);
 	}
 	
-	public static void main( String[] args ) throws IOException, InterruptedException
+	public static void main(String[] args) throws IOException, InterruptedException
     {
     	// set a nice log format
 		System.setProperty("java.util.logging.SimpleFormatter.format",
@@ -427,8 +426,7 @@ public class FileSharingPeer {
         if(cmd.hasOption("host")) {
         	host = cmd.getOptionValue("host");
         }
-        
-        
+
         // start up the client
         log.info("PB Peer starting up");
  

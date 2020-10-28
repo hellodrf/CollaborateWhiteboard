@@ -1,6 +1,8 @@
 package pb;
 
 import java.io.IOException;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 import org.apache.commons.cli.CommandLine;
@@ -11,8 +13,12 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 
 
+import pb.app.Whiteboard;
+import pb.app.WhiteboardApp;
 import pb.managers.ServerManager;
 import pb.utils.Utils;
+
+import static pb.managers.IOThread.ioThread;
 
 /**
  * Simple whiteboard server to provide whiteboard peer notifications.
@@ -20,11 +26,11 @@ import pb.utils.Utils;
  *
  */
 public class WhiteboardServer {
-	private static Logger log = Logger.getLogger(WhiteboardServer.class.getName());
+	private static final Logger log = Logger.getLogger(WhiteboardServer.class.getName());
 	
 	/**
 	 * Emitted by a client to tell the server that a board is being shared. Argument
-	 * must have the format "host:port:boardid".
+	 * must have the format "host:port:boardID".
 	 * <ul>
 	 * <li>{@code args[0] instanceof String}</li>
 	 * </ul>
@@ -33,7 +39,7 @@ public class WhiteboardServer {
 
 	/**
 	 * Emitted by a client to tell the server that a board is no longer being
-	 * shared. Argument must have the format "host:port:boardid".
+	 * shared. Argument must have the format "host:port:boardID".
 	 * <ul>
 	 * <li>{@code args[0] instanceof String}</li>
 	 * </ul>
@@ -47,7 +53,7 @@ public class WhiteboardServer {
 	 * <li>to a newly connected client, it emits this event several times, for all
 	 * boards that are currently known to be being shared</li>
 	 * </ul>
-	 * Argument has format "host:port:boardid"
+	 * Argument has format "host:port:boardID"
 	 * <ul>
 	 * <li>{@code args[0] instanceof String}</li>
 	 * </ul>
@@ -60,7 +66,7 @@ public class WhiteboardServer {
 	 * <li>to all connected clients to tell them that a board is no longer
 	 * shared</li>
 	 * </ul>
-	 * Argument has format "host:port:boardid"
+	 * Argument has format "host:port:boardID"
 	 * <ul>
 	 * <li>{@code args[0] instanceof String}</li>
 	 * </ul>
@@ -80,8 +86,10 @@ public class WhiteboardServer {
 	 * Default port number.
 	 */
 	private static int port = Utils.indexServerPort;
-	
-	
+
+
+	private static final Map<String, String> whiteboards = new ConcurrentHashMap<>();
+
 	
 	private static void help(Options options){
 		String header = "PB Whiteboard Server for Unimelb COMP90015\n\n";
@@ -91,7 +99,7 @@ public class WhiteboardServer {
 		System.exit(-1);
 	}
 	
-	public static void main( String[] args ) throws IOException, InterruptedException
+	public static void main(String[] args) throws IOException, InterruptedException
     {
     	// set a nice log format
 		System.setProperty("java.util.logging.SimpleFormatter.format",
@@ -106,12 +114,13 @@ public class WhiteboardServer {
         CommandLineParser parser = new DefaultParser();
         CommandLine cmd = null;
         try {
-			cmd = parser.parse( options, args);
+			cmd = parser.parse(options, args);
 		} catch (ParseException e1) {
 			help(options);
 		}
-        
-        if(cmd.hasOption("port")){
+
+		assert cmd != null;
+		if(cmd.hasOption("port")){
         	try{
         		port = Integer.parseInt(cmd.getOptionValue("port"));
 			} catch (NumberFormatException e){
@@ -124,14 +133,19 @@ public class WhiteboardServer {
         ServerManager serverManager;
         
         if(cmd.hasOption("password")) {
-        	serverManager = new ServerManager(port,cmd.getOptionValue("password"));
+        	serverManager = new ServerManager(port, cmd.getOptionValue("password"));
         } else {
         	serverManager = new ServerManager(port);
         }
         
-        /**
+        /*
          * TODO: Put some server related code here.
          */
+
+		serverManager.on(ioThread, (args1 -> {
+			String peerPort = (String) args1[0];
+			log.info("Waiting for peers to connect...");
+		}));
         
         // start up the server
         log.info("Whiteboard Server starting up");

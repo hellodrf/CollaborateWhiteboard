@@ -10,7 +10,8 @@ import java.util.logging.Logger;
  *
  */
 public class Whiteboard {
-	private static Logger log = Logger.getLogger(Whiteboard.class.getName());
+
+	private static final Logger log = Logger.getLogger(Whiteboard.class.getName());
 
 	/**
 	 * Paths for this whiteboard.
@@ -18,7 +19,7 @@ public class Whiteboard {
 	private ArrayList<WhiteboardPath> paths;
 	
 	/**
-	 * Name of the whiteboard, peer:port:boarid
+	 * Name of the whiteboard, peer:port:boardID
 	 */
 	private String name;
 	
@@ -31,20 +32,20 @@ public class Whiteboard {
 	 * Whether this whiteboard is being shared or not. Only relevant
 	 * for boards that are created locally.
 	 */
-	private boolean shared=false;
+	private boolean shared = false;
 	
 	/**
 	 * Whether this whiteboard is a remote board, i.e. not created
 	 * locally but rather being managed on another peer.
 	 */
-	private boolean remote=false;
+	private boolean remote = false;
 	
 	/**
 	 * Initialize the whiteboard.
 	 * @param remote is true if the whiteboard is remotely managed, otherwise
 	 * the whiteboard is locally managed.
 	 */
-	public Whiteboard(String name,boolean remote) {
+	public Whiteboard(String name, boolean remote) {
 		paths = new ArrayList<>();
 		this.name=name;
 		this.version=0;
@@ -54,15 +55,15 @@ public class Whiteboard {
 	/**
 	 * Initialize a whiteboard from a string.
 	 * 
-	 * @param name the board name, i.e. peer:port:boardid
+	 * @param name the board name, i.e. peer:port:boardID
 	 * @param data the board data, i.e. version%PATHS 
 	 */
-	public void whiteboardFromString(String name,String data) {
+	public void whiteboardFromString(String name, String data) {
 		String[] parts = data.split("%");
 		paths = new ArrayList<>();
-		this.name=name;
-		version=-1;
-		if(parts.length<1) {
+		this.name = name;
+		version = -1;
+		if(parts.length < 1) {
 			log.severe("whiteboard data is malformed: "+data);
 			return;
 		}
@@ -72,7 +73,7 @@ public class Whiteboard {
 			log.severe("whiteboard data is malformed: "+data);
 			return;
 		}
-		if(parts.length>1) {
+		if(parts.length > 1) {
 			for (int i = 1; i < parts.length; i++) {
 				String path = parts[i];
 				if (path.length() > 0) {
@@ -95,8 +96,8 @@ public class Whiteboard {
 		if(paths.size()==0) 
 			sb.append("%");
 		else {
-			for (int i = 0; i < paths.size(); i++) {
-				sb.append("%"+paths.get(i));
+			for (WhiteboardPath path : paths) {
+				sb.append("%").append(path);
 			}
 		}
 		return sb.toString();
@@ -105,7 +106,7 @@ public class Whiteboard {
 	/**
 	 * Draw the white board on the drawing area. Clears the draw
 	 * area and draws all paths.
-	 * @param drawArea
+	 * @param drawArea draw area
 	 */
 	public void draw(DrawArea drawArea) {
 		drawArea.clear();
@@ -120,7 +121,7 @@ public class Whiteboard {
 	
 	/**
 	 * Add a path to the whiteboard.
-	 * @param newPath
+	 * @param newPath path
 	 * @param versionBeingUpdated should be the board version that the update applies to
 	 * @return true if the update was accepted, false if it was rejected
 	 */
@@ -157,7 +158,7 @@ public class Whiteboard {
 	
 	/**
 	 * 
-	 * @return peer:port:boardid%version
+	 * @return peer:port:boardID%version
 	 */
 	public String getNameAndVersion() {
 		return getName()+"%"+getVersion();
@@ -165,7 +166,7 @@ public class Whiteboard {
 	
 	/**
 	 * 
-	 * @return
+	 * @return name
 	 */
 	public String getName() {
 		return name;
@@ -181,7 +182,7 @@ public class Whiteboard {
 	
 	/**
 	 * Set the shared status of the board
-	 * @param shared
+	 * @param shared boolean
 	 */
 	public void setShared(boolean shared) {
 		this.shared=shared;
