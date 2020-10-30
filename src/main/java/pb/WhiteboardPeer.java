@@ -84,7 +84,7 @@ public class WhiteboardPeer {
         	try{
         		whiteboardServerPort = Integer.parseInt(cmd.getOptionValue("whiteboardServerPort"));
 			} catch (NumberFormatException e){
-				System.out.println("-whiteboardServerPort requires a port number, parsed: "+
+				System.out.println("-whiteboardServerPort requires a port number, parsed: " +
 						cmd.getOptionValue("whiteboardServerPort"));
 				help(options);
 			}

@@ -91,9 +91,9 @@ public class WhiteboardServer {
 	private static int port = Utils.indexServerPort;
 
 
-	private static final Map<String, String> whiteboards = new ConcurrentHashMap<>();
+	private static final Map<String, String> whiteboards = new ConcurrentHashMap<>(); // board name : Whiteboard
 
-	private static final Map<String, Endpoint> peers = new ConcurrentHashMap<>();
+	private static final Map<String, Endpoint> peers = new ConcurrentHashMap<>(); // peer address : Endpoint
 
 	private static final Map<String, String> peersPortMap = new ConcurrentHashMap<>();
 

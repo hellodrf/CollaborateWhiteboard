@@ -3,6 +3,8 @@ package pb.app;
 import pb.managers.endpoint.Endpoint;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
 /**
@@ -215,4 +217,5 @@ public class Whiteboard {
 	public void setRemoteSource(Endpoint remoteSource) {
 		this.remoteSource = remoteSource;
 	}
+
 }
