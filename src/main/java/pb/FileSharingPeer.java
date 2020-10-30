@@ -266,7 +266,7 @@ public class FileSharingPeer {
 		String[] parts=response.split(":",3);
 		ClientManager clientManager;
 		try {
-			clientManager = peerManager.connect(Integer.valueOf(parts[1]),parts[0]);
+			clientManager = peerManager.connect(Integer.parseInt(parts[1]),parts[0]);
 		} catch (NumberFormatException e) {
 			System.out.println("Response from index server is bad, port is not a number: "+parts[1]);
 			return;

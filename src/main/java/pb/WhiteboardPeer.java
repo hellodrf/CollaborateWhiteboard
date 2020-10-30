@@ -54,7 +54,7 @@ public class WhiteboardPeer {
 	public static void main(String[] args) throws InterruptedException, UnknownHostException {
 		// set a nice log format
 		System.setProperty("java.util.logging.SimpleFormatter.format",
-                "[%1$tl:%1$tM:%1$tS:%1$tL] %2$s %4$s: %5$s%n");
+                "[%1$tl:%1$tM:%1$tS:%1$tL] [%4$s] %2$s : %5$s%n");
 		
 		Options options = new Options();
         options.addOption("port",true,"peer server port, an integer");

@@ -1,5 +1,7 @@
 package pb.app;
 
+import pb.managers.endpoint.Endpoint;
+
 import java.util.ArrayList;
 import java.util.logging.Logger;
 
@@ -39,6 +41,8 @@ public class Whiteboard {
 	 * locally but rather being managed on another peer.
 	 */
 	private boolean remote = false;
+
+	private Endpoint remoteSource = null;
 	
 	/**
 	 * Initialize the whiteboard.
@@ -203,5 +207,12 @@ public class Whiteboard {
 	public boolean isRemote() {
 		return remote;
 	}
-	
+
+	public Endpoint getRemoteSource() {
+		return remoteSource;
+	}
+
+	public void setRemoteSource(Endpoint remoteSource) {
+		this.remoteSource = remoteSource;
+	}
 }

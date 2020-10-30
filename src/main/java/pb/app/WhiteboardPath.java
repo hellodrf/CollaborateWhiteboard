@@ -12,7 +12,7 @@ import java.util.logging.Logger;
  *
  */
 public class WhiteboardPath {
-	private static Logger log = Logger.getLogger(WhiteboardPath.class.getName());
+	private static final Logger log = Logger.getLogger(WhiteboardPath.class.getName());
 	
 	/**
 	 * List of points in the path.

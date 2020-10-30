@@ -21,7 +21,7 @@ import java.util.logging.Logger;
  */
 public class IOThread extends Thread {
 	private static Logger log = Logger.getLogger(IOThread.class.getName());
-	private ServerSocket serverSocket=null;
+	private ServerSocket serverSocket = null;
 	private int port;
 	private ServerManager serverManager;
 	

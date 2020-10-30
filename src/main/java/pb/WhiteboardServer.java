@@ -2,6 +2,7 @@ package pb;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
@@ -15,7 +16,9 @@ import org.apache.commons.cli.ParseException;
 
 import pb.app.Whiteboard;
 import pb.app.WhiteboardApp;
+import pb.managers.PeerManager;
 import pb.managers.ServerManager;
+import pb.managers.endpoint.Endpoint;
 import pb.utils.Utils;
 
 import static pb.managers.IOThread.ioThread;
@@ -90,6 +93,10 @@ public class WhiteboardServer {
 
 	private static final Map<String, String> whiteboards = new ConcurrentHashMap<>();
 
+	private static final Map<String, Endpoint> peers = new ConcurrentHashMap<>();
+
+	private static final Map<String, String> peersPortMap = new ConcurrentHashMap<>();
+
 	
 	private static void help(Options options){
 		String header = "PB Whiteboard Server for Unimelb COMP90015\n\n";
@@ -137,14 +144,62 @@ public class WhiteboardServer {
         } else {
         	serverManager = new ServerManager(port);
         }
-        
-        /*
-         * TODO: Put some server related code here.
-         */
 
 		serverManager.on(ioThread, (args1 -> {
 			String peerPort = (String) args1[0];
+			log.info("Server started on " + peerPort);
 			log.info("Waiting for peers to connect...");
+		})).on(ServerManager.sessionStarted, (args1 -> {
+			Endpoint endpoint = (Endpoint) args1[0];
+			peers.put(endpoint.getOtherEndpointId(), endpoint);
+			System.out.println("Peer connected: " + endpoint.getOtherEndpointId());
+			for (String board: whiteboards.values()) {
+				endpoint.emit(sharingBoard, board);
+			}
+			endpoint.on(shareBoard, (args2 -> {
+				String pp = (String)args2[0];
+				String id = WhiteboardApp.parsePeer(pp)[2];
+				String ppi = WhiteboardApp.parsePeer(pp)[0]+":" +WhiteboardApp.parsePeer(pp)[1];
+				peersPortMap.put(endpoint.getOtherEndpointId(), ppi);
+				System.out.println("New whiteboard: " + pp);
+				if (!whiteboards.containsKey(id)) {
+					whiteboards.put(id, pp);
+					log.info("Received whiteboard: " + pp);
+					for (Endpoint e: peers.values()) {
+						if (!e.getOtherEndpointId().equals(endpoint.getOtherEndpointId())) {
+							log.info("Sharing " + pp + " to " + e.getOtherEndpointId());
+							e.emit(sharingBoard, pp);
+						}
+					}
+				} else {
+					log.warning("Duplicate sharing request: " + pp);
+				}
+			})).on(unshareBoard, (args2 -> {
+				String pp = (String)args2[0];
+				String id = WhiteboardApp.parsePeer(pp)[2];
+				if (whiteboards.containsKey(id)) {
+					whiteboards.remove(id);
+					log.info("Received unsharing request: " + pp);
+					for (Endpoint e: peers.values()) {
+						if (!e.getOtherEndpointId().equals(endpoint.getOtherEndpointId())) {
+							log.info("Unsharing" + pp + " from " + e.getOtherEndpointId());
+							e.emit(unsharingBoard, pp);
+						}
+					}
+				} else {
+					log.warning("Whiteboard not exist but unshared: " + pp);
+				}
+			}));
+		})).on(ServerManager.sessionStopped, (args1 -> {
+			Endpoint endpoint = (Endpoint) args1[0];
+			peers.remove(endpoint.getOtherEndpointId());
+			log.info("Peer disconnected: " + endpoint.getOtherEndpointId());
+			removeAllBoards(endpoint);
+		})).on(ServerManager.sessionError, (args1 -> {
+			Endpoint endpoint = (Endpoint) args1[0];
+			peers.remove(endpoint.getOtherEndpointId());
+			log.severe("Peer disconnected due to error: " + endpoint.getOtherEndpointId());
+			removeAllBoards(endpoint);
 		}));
         
         // start up the server
@@ -153,7 +208,21 @@ public class WhiteboardServer {
         // nothing more for the main thread to do
         serverManager.join();
         Utils.getInstance().cleanUp();
-        
     }
+
+	private static void removeAllBoards(Endpoint endpoint) {
+		for (String pp : whiteboards.values()) {
+			String[] data = WhiteboardApp.parsePeer(pp);
+			if ((data[0] + ":" + data[1]).equals(peersPortMap.get(endpoint.getOtherEndpointId()))) {
+				whiteboards.remove(data[2]);
+				log.info("Peer board dropped due to disconnection: " + pp);
+				for (Endpoint e: peers.values()) {
+					if (!e.getOtherEndpointId().equals(endpoint.getOtherEndpointId())) {
+						e.emit(unsharingBoard, pp);
+					}
+				}
+			}
+		}
+	}
 
 }

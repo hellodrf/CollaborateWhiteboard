@@ -141,7 +141,7 @@ public class ServerManager extends Manager implements ISessionProtocolHandler,
 	 * @param port to use when creating the io thread
 	 * @param password to use by admin clients
 	 */
-	public ServerManager(int port,String password) {
+	public ServerManager(int port, String password) {
 		this.port=port;
 		liveEndpoints=new HashSet<>();
 		this.password = password;
@@ -238,6 +238,7 @@ public class ServerManager extends Manager implements ISessionProtocolHandler,
 		
 		// let's wait for the remaining clients if we can
 		while(numLiveEndpoints()>0 && !vaderShutdown) {
+			System.out.println();
 			log.warning("still waiting for "+numLiveEndpoints()+" to finish");
 			try {
 				Thread.sleep(1000); // just wait a little longer
