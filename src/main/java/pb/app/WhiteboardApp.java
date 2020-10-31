@@ -6,11 +6,10 @@ import pb.managers.IOThread;
 import pb.managers.PeerManager;
 import pb.managers.ServerManager;
 import pb.managers.endpoint.Endpoint;
+import pb.utils.Utils;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Container;
+import javax.swing.*;
+import java.awt.*;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.WindowAdapter;
@@ -19,17 +18,7 @@ import java.net.UnknownHostException;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Logger;
-
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JComboBox;
-import javax.swing.JFrame;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.SwingUtilities;
 
 
 /**
@@ -81,7 +70,7 @@ public class WhiteboardApp {
 	public static final String boardData = "BOARD_DATA";
 
 	/**
-	 * Emitted to another peer to override their current board (ignore their current version).
+	 * Emitted to another peer to override their current board (ignore version).
 	 * <ul>
 	 * <li>{@code args[0] instanceof String}</li>
 	 * </ul>
@@ -195,15 +184,24 @@ public class WhiteboardApp {
 	 */
 	String peerPort;
 
+	/**
+	 * Peer manager, index server client manager and endpoint
+	 */
 	PeerManager peerManager = null;
 
 	ClientManager serverClientManager = null;
 
+	Endpoint serverEndpoint = null;
+
+	/**
+	 * Subscription map to endpoint, for change broadcasts to certain subscribers.
+	 */
 	Map<String, ArrayList<Endpoint>> subscriptionEndpointMap; // board name : <Endpoint>
 
+	/**
+	 * Endpoint id map to remote boards, for clean-ups upon endpoint closure.
+	 */
 	Map<String, ArrayList<String>> remoteBoardMap; // endpoint id : <board name>
-
-	Endpoint serverEndpoint = null;
 
 	/**
 	 * Initialize the white board app.
@@ -213,13 +211,12 @@ public class WhiteboardApp {
 		this.whiteboards = new ConcurrentHashMap<>();
 		this.subscriptionEndpointMap = new ConcurrentHashMap<>();
 		this.remoteBoardMap = new ConcurrentHashMap<>();
-		this.peerPort = "127.0.0.1:" + peerPort;
 		startPeerServer(peerPort);
 		connectToIndexServer(whiteboardServerHost, whiteboardServerPort);
 	}
 
 	/**
-	 * Start the server that receive peer connections and board requests
+	 * Start the server that receive peer connections and board requests.
 	 * @param peerPort port
 	 */
 	public void startPeerServer(int peerPort) {
@@ -229,6 +226,7 @@ public class WhiteboardApp {
 			serverManager.on(IOThread.ioThread, (args2)->{
 				this.peerPort = (String) args2[0];
 				show(this.peerPort);
+				startHeartbeat();
 			});
 		}).on(PeerManager.peerStarted, (args)-> {
 			Endpoint endpoint = (Endpoint) args[0];
@@ -261,13 +259,15 @@ public class WhiteboardApp {
 					endpoint.emit(boardData, whiteboards.get(args1[0]).toString());
 					log.info("Board " + args1[0] + " sent to: " + endpoint.getOtherEndpointId());
 				} else {
-					log.info("Board " + args1[0] + " does not exist");
+					endpoint.emit(boardError, "BOARD_NOT_FOUND");
+					log.warning("Board " + args1[0] + " does not exist but queried");
 				}
 			}).on(boardPathUpdate, (args1) -> {
 				String data = (String) args1[0];
 				Whiteboard board = whiteboards.get(getBoardName(data));
 				if (board == null) {
 					endpoint.emit(boardError, "BOARD_NOT_FOUND");
+					log.warning("Board " + args1[0] + " does not exist but queried");
 				} else {
 					if (pathCreatedRemotely(new WhiteboardPath(getBoardPaths(data)), board, getBoardVersion(data))) {
 						endpoint.emit(boardPathAccepted, data);
@@ -281,6 +281,7 @@ public class WhiteboardApp {
 				Whiteboard board = whiteboards.get(getBoardName(data));
 				if (board == null) {
 					endpoint.emit(boardError, "BOARD_NOT_FOUND");
+					log.warning("Board " + args1[0] + " does not exist but queried");
 				} else {
 					if (undoRemotely(board, getBoardVersion(data))) {
 						endpoint.emit(boardUndoAccepted, data);
@@ -294,6 +295,7 @@ public class WhiteboardApp {
 				Whiteboard board = whiteboards.get(getBoardName(data));
 				if (board == null) {
 					endpoint.emit(boardError, "BOARD_NOT_FOUND");
+					log.warning("Board " + args1[0] + " does not exist but queried");
 				} else {
 					if (clearedRemotely(board, getBoardVersion(data))) {
 						endpoint.emit(boardClearAccepted, data);
@@ -316,7 +318,7 @@ public class WhiteboardApp {
 	}
 
 	/**
-	 * Connect to the index server and keep-alive for updates
+	 * Connect to the index server and keep-alive for updates.
 	 * @param host server host
 	 * @param port server port
 	 */
@@ -340,9 +342,9 @@ public class WhiteboardApp {
 				if (whiteboards.containsKey(boardName)) {
 					deleteBoard(boardName);
 					log.info("Board removed by index server: " + boardName);
-				}
+				} // since this call could (very likely) be a redundancy, we should tolerate this
             });
-			for (Whiteboard w:whiteboards.values()) {
+			for (Whiteboard w : whiteboards.values()) {
 				if (!w.isRemote() && w.isShared()) {
 					setShareToServer(w, true);
 				}
@@ -359,7 +361,7 @@ public class WhiteboardApp {
 	}
 
 	/**
-	 * Connect to a peer server and keep-alive for board updates
+	 * Connect to a peer server and keep-alive for board updates.
 	 * @param host peer host
 	 * @param port peer port
 	 * @param firstBoard the first board to request
@@ -371,43 +373,40 @@ public class WhiteboardApp {
 			clientManager.on(PeerManager.peerStarted, (args) -> {
 				Endpoint endpoint = (Endpoint) args[0];
 				log.info("Peer connected: " + endpoint.getOtherEndpointId());
-				endpoint.on(boardData, (args1 -> acceptBoard((String)args1[0], endpoint, false))
-				).on(boardDataOverride, (args1 -> acceptBoard((String)args1[0], endpoint, true))
+				endpoint.on(boardData, (args1 -> acceptRemoteBoard((String)args1[0], endpoint, false))
+				).on(boardDataOverride, (args1 -> acceptRemoteBoard((String)args1[0], endpoint, true))
 				).on(boardPathAccepted, (args1) -> {
 					String data = (String) args1[0];
-					log.info("Modification accepted by remote peer " + endpoint.getOtherEndpointId()
+					log.info("Modification accepted by " + endpoint.getOtherEndpointId()
 							+ ": " + getBoardName(data) + " - " + getBoardPaths(data));
 				}).on(boardUndoAccepted, (args1) -> {
 					String data = (String) args1[0];
-					log.info("Modification accepted by remote peer " + endpoint.getOtherEndpointId()
+					log.info("Modification accepted by " + endpoint.getOtherEndpointId()
 							+ ": " + getBoardName(data) + " - UNDO");
 				}).on(boardClearAccepted, (args1) -> {
 					String data = (String) args1[0];
-					log.info("Modification accepted by remote peer " + endpoint.getOtherEndpointId()
+					log.info("Modification accepted by " + endpoint.getOtherEndpointId()
 							+ ": " + getBoardName(data) + " - CLEAR");
-				}).on(WhiteboardServer.unsharingBoard, (args1 -> {
-					String boardName = (String) args1[0];
-					deleteBoard(boardName);
-				})).on(boardError, (args1 -> {
+				}).on(boardError, (args1 -> {
 					String message = (String) args1[0];
-					log.info("Error from remote peer " + endpoint.getOtherEndpointId()
+					log.info("Error from " + endpoint.getOtherEndpointId()
 							+ ": " + message);
 				})).on(boardDeleted, (args1 -> {
 					String boardName = (String) args1[0];
 					if (whiteboards.containsKey(boardName)) {
 						deleteBoard(boardName);
 						log.info("Board removed by remote peer: " + boardName);
-					} // since this call could (very likely) be redundancy, we should tolerate this
+					} // since this call could (very likely) be a redundancy, we should tolerate this
 				}));
 				endpoint.emit(listenBoard, firstBoard);
 				endpoint.emit(getBoardData, firstBoard);
 			}).on(PeerManager.peerStopped, (args) -> {
 				Endpoint endpoint = (Endpoint) args[0];
-				removeByEndpoint(endpoint);
+				removeAllBoardsByEndpoint(endpoint);
 				log.info("Peer disconnected: " + endpoint.getOtherEndpointId());
 			}).on(PeerManager.peerError, (args) -> {
 				Endpoint endpoint = (Endpoint) args[0];
-				removeByEndpoint(endpoint);
+				removeAllBoardsByEndpoint(endpoint);
 				log.severe("Peer connection ended in error: " + endpoint.getOtherEndpointId());
 				endpoint.close();
 			});
@@ -421,7 +420,18 @@ public class WhiteboardApp {
 	 */
 
 	// From whiteboard peer
-	private void acceptBoard(String boardData, Endpoint endpoint, boolean override) {
+
+	private void startHeartbeat() {
+		Utils.getInstance().setTimeout(() -> {
+			if (!subscriptionEndpointMap.isEmpty()) {
+				whiteboards.values().forEach(this::broadcastChanges);
+				log.info("Heartbeat executed");
+				startHeartbeat();
+			}
+		}, 5000);
+	}
+
+	private void acceptRemoteBoard(String boardData, Endpoint endpoint, boolean override) {
 		String name = getBoardName(boardData);
 		String data = getBoardData(boardData);
 		long version = getBoardVersion(boardData);
@@ -459,7 +469,7 @@ public class WhiteboardApp {
 		}
 	}
 
-	private void removeByEndpoint(Endpoint endpoint) {
+	private void removeAllBoardsByEndpoint(Endpoint endpoint) {
     	String eid = endpoint.getOtherEndpointId();
     	ArrayList<String> whiteboards = remoteBoardMap.get(eid);
     	whiteboards.forEach(this::deleteBoard);
@@ -701,7 +711,7 @@ public class WhiteboardApp {
 				return true;
 			}
 		} else {
-			log.severe("Remote cleared targeted for a non-existent board");
+			log.severe("Remote clear targeted for a non-existent board");
 			return false;
 		}
 	}
@@ -774,7 +784,7 @@ public class WhiteboardApp {
 		System.out.println("GUI application terminated, exiting...");
 		log.info("GUI application terminated, cleaning up...");
 		// do some final cleanup
-		HashSet<Whiteboard> existingBoards= new HashSet<>(whiteboards.values());
+		HashSet<Whiteboard> existingBoards = new HashSet<>(whiteboards.values());
 		existingBoards.forEach((board)-> deleteBoard(board.getName()));
     	whiteboards.values().forEach((whiteboard)->{
 			if (whiteboard.isRemote() && whiteboard.getRemoteSource()!=null) {
@@ -948,8 +958,7 @@ public class WhiteboardApp {
 		        if (JOptionPane.showConfirmDialog(frame, 
 		            "Are you sure you want to close this window?", "Close Window?", 
 		            JOptionPane.YES_NO_OPTION,
-		            JOptionPane.QUESTION_MESSAGE) == JOptionPane.YES_OPTION)
-		        {
+		            JOptionPane.QUESTION_MESSAGE) == JOptionPane.YES_OPTION) {
 		        	guiShutdown();
 		            frame.dispose();
 		        }

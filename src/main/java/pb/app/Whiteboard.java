@@ -53,9 +53,9 @@ public class Whiteboard {
 	 */
 	public Whiteboard(String name, boolean remote) {
 		paths = new ArrayList<>();
-		this.name=name;
-		this.version=0;
-		this.remote=remote;
+		this.name = name;
+		this.version = 0;
+		this.remote = remote;
 	}
 	
 	/**
@@ -132,10 +132,14 @@ public class Whiteboard {
 	 * @return true if the update was accepted, false if it was rejected
 	 */
 	public synchronized boolean addPath(WhiteboardPath newPath,long versionBeingUpdated) {
-		if(version!=versionBeingUpdated) return false;
-		paths.add(newPath);
-		this.version++;
-		return true;
+		boolean result = true;
+		if (version != versionBeingUpdated) {
+			result = false;
+		} else {
+			paths.add(newPath);
+			this.version++;
+		}
+		return result;
 	}
 	
 	/**
@@ -144,22 +148,30 @@ public class Whiteboard {
 	 * @return true if the update was accepted, false if it was rejected
 	 */
 	public synchronized boolean clear(long versionBeingUpdated) {
-		if(version!=versionBeingUpdated) return false;
-		paths.clear();
-		this.version++;
-		return true;
+		boolean result = true;
+		if (version != versionBeingUpdated) {
+			result = false;
+		} else {
+			paths.clear();
+			this.version++;
+		}
+		return result;
 	}
-	
+
 	/**
 	 * Remove the last path from the board.
 	 */
 	public synchronized boolean undo(long versionBeingUpdated) {
-		if(version!=versionBeingUpdated) return false;
-		if(paths.size()>0) {
-			paths.remove(paths.size()-1);
+		boolean result = true;
+		if (version != versionBeingUpdated) {
+			result = false;
+		} else {
+			if (paths.size() > 0) {
+				paths.remove(paths.size() - 1);
+			}
+			this.version++;
 		}
-		this.version++;
-		return true;
+		return result;
 	}
 	
 	/**
@@ -210,6 +222,10 @@ public class Whiteboard {
 		return remote;
 	}
 
+	/**
+	 *
+	 * @return the remote endpoint
+	 */
 	public Endpoint getRemoteSource() {
 		return remoteSource;
 	}
