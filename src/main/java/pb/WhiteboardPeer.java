@@ -21,6 +21,7 @@ import pb.utils.Utils;
  */
 public class WhiteboardPeer {
 
+	@SuppressWarnings("unused")
 	private static final Logger log = Logger.getLogger(WhiteboardPeer.class.getName());
 
 	/**

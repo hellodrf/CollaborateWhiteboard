@@ -255,19 +255,20 @@ public class WhiteboardApp {
 					}
 				}
 			}).on(getBoardData, (args1) -> {
-				if (whiteboards.containsKey((String) args1[0])) {
-					endpoint.emit(boardData, whiteboards.get(args1[0]).toString());
-					log.info("Board " + args1[0] + " sent to: " + endpoint.getOtherEndpointId());
+				String board = (String) args1[0];
+				if (whiteboards.containsKey(board)) {
+					endpoint.emit(boardData, whiteboards.get(board).toString());
+					log.info("Board " + board + " sent to: " + endpoint.getOtherEndpointId());
 				} else {
 					endpoint.emit(boardError, "BOARD_NOT_FOUND");
-					log.warning("Board " + args1[0] + " does not exist but queried");
+					log.warning("Board " + board + " does not exist but queried");
 				}
 			}).on(boardPathUpdate, (args1) -> {
 				String data = (String) args1[0];
 				Whiteboard board = whiteboards.get(getBoardName(data));
 				if (board == null) {
 					endpoint.emit(boardError, "BOARD_NOT_FOUND");
-					log.warning("Board " + args1[0] + " does not exist but queried");
+					log.warning("Board " + data + " does not exist but queried");
 				} else {
 					if (pathCreatedRemotely(new WhiteboardPath(getBoardPaths(data)), board, getBoardVersion(data))) {
 						endpoint.emit(boardPathAccepted, data);
@@ -281,7 +282,7 @@ public class WhiteboardApp {
 				Whiteboard board = whiteboards.get(getBoardName(data));
 				if (board == null) {
 					endpoint.emit(boardError, "BOARD_NOT_FOUND");
-					log.warning("Board " + args1[0] + " does not exist but queried");
+					log.warning("Board " + data + " does not exist but queried");
 				} else {
 					if (undoRemotely(board, getBoardVersion(data))) {
 						endpoint.emit(boardUndoAccepted, data);
@@ -295,7 +296,7 @@ public class WhiteboardApp {
 				Whiteboard board = whiteboards.get(getBoardName(data));
 				if (board == null) {
 					endpoint.emit(boardError, "BOARD_NOT_FOUND");
-					log.warning("Board " + args1[0] + " does not exist but queried");
+					log.warning("Board " + data + " does not exist but queried");
 				} else {
 					if (clearedRemotely(board, getBoardVersion(data))) {
 						endpoint.emit(boardClearAccepted, data);
@@ -330,8 +331,9 @@ public class WhiteboardApp {
             System.out.println("Connected to index server: " + serverEndpoint.getOtherEndpointId());
             serverEndpoint.on(WhiteboardServer.sharingBoard, (args1 -> {
 				String[] parts = parsePeer((String) args1[0]);
+				String board = (String) args1[0];
 				log.info("Received new board source: " + Arrays.toString(parts));
-            	if (!whiteboards.containsKey((String) args1[0])) {
+            	if (!whiteboards.containsKey(board)) {
 					String pp = parts[0] + ":" + parts[1];
 					if (!subscriptionEndpointMap.containsKey(pp)) {
 						connectToPeer(parts[0], Integer.parseInt(parts[1]), (String) args1[0]);
@@ -510,6 +512,7 @@ public class WhiteboardApp {
 	 * @return boardID
 	 * %version%PATHS
 	 */
+	@SuppressWarnings("unused")
 	public static String getBoardIDAndData(String data) {
 		String[] parts=data.split(":");
 		return parts[2];
@@ -554,6 +557,7 @@ public class WhiteboardApp {
 	 *                d%version%PATHS
 	 * @return peer
 	 */
+	@SuppressWarnings("unused")
 	public static String getIP(String data) {
 		String[] parts=data.split(":");
 		return parts[0];
@@ -565,6 +569,7 @@ public class WhiteboardApp {
 	 *                %version%PATHS
 	 * @return port
 	 */
+	@SuppressWarnings("unused")
 	public static int getPort(String data) {
 		String[] parts=data.split(":");
 		return Integer.parseInt(parts[1]);
@@ -783,14 +788,10 @@ public class WhiteboardApp {
 	public void guiShutdown() {
 		System.out.println("GUI application terminated, exiting...");
 		log.info("GUI application terminated, cleaning up...");
+
 		// do some final cleanup
 		HashSet<Whiteboard> existingBoards = new HashSet<>(whiteboards.values());
 		existingBoards.forEach((board)-> deleteBoard(board.getName()));
-    	whiteboards.values().forEach((whiteboard)->{
-			if (whiteboard.isRemote() && whiteboard.getRemoteSource()!=null) {
-				//whiteboard.getRemoteSource().close();
-			}
-    	});
     	peerManager.getServerManager().forceShutdown();
     	peerManager.shutdown();
 		log.info("Clean up finished, terminating...");
@@ -987,12 +988,12 @@ public class WhiteboardApp {
 				ArrayList<String> boards = new ArrayList<>(whiteboards.keySet());
 				Collections.sort(boards);
 				for(int i=0;i<boards.size();i++) {
-					String boardname=boards.get(i);
-					boardComboBox.addItem(boardname);
-					if(select!=null && select.equals(boardname)) {
+					String boardName=boards.get(i);
+					boardComboBox.addItem(boardName);
+					if(select!=null && select.equals(boardName)) {
 						anIndex=i;
 					} else if(anIndex==-1 && selectedBoard!=null &&
-							selectedBoard.getName().equals(boardname)) {
+							selectedBoard.getName().equals(boardName)) {
 						anIndex=i;
 					}
 				}
