@@ -80,7 +80,6 @@ public class WhiteboardServer {
 	 */
 	private static int port = Utils.indexServerPort;
 
-
 	private static final Map<String, String> whiteboards = new ConcurrentHashMap<>(); // board name : Whiteboard
 
 	private static final Map<String, Endpoint> peers = new ConcurrentHashMap<>(); // peer address : Endpoint
@@ -163,6 +162,7 @@ public class WhiteboardServer {
 					}
 				} else {
 					log.warning("Duplicate sharing request: " + pp);
+					endpoint.emit(error, "DUPLICATE_SHARING_REQUEST");
 				}
 			})).on(unshareBoard, (args2 -> {
 				String pp = (String)args2[0];
@@ -178,6 +178,7 @@ public class WhiteboardServer {
 					}
 				} else {
 					log.warning("Whiteboard not exist but unshared: " + pp);
+					endpoint.emit(error, "WHITEBOARD_NOT_EXIST_BUT_UNSHARED");
 				}
 			}));
 		})).on(ServerManager.sessionStopped, (args1 -> {
@@ -214,5 +215,4 @@ public class WhiteboardServer {
 			}
 		}
 	}
-
 }

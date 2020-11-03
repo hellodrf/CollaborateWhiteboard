@@ -33,12 +33,12 @@ public class WhiteboardPeer {
 	/**
 	 * port to use when contacting the index server
 	 */
-	private static int whiteboardServerPort=Utils.indexServerPort; // default port number for index server
+	private static int whiteboardServerPort = Utils.indexServerPort; // default port number for index server
 
 	/**
 	 * host to use when contacting the index server
 	 */
-	private static String host=Utils.serverHost; // default host for the index server
+	private static String host = Utils.serverHost; // default host for the index server
 	
 	/**
 	 * Print some help.

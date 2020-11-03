@@ -184,6 +184,10 @@ public class WhiteboardApp {
 	 */
 	String peerPort;
 
+	String indexServerHost;
+
+	int indexServerPort;
+
 	/**
 	 * Peer manager, index server client manager and endpoint
 	 */
@@ -194,25 +198,25 @@ public class WhiteboardApp {
 	Endpoint serverEndpoint = null;
 
 	/**
-	 * Subscription map to endpoint, for change broadcasts to certain subscribers.
+	 * Subscription map: board to endpoint, for subscriber broadcasts.
 	 */
 	Map<String, ArrayList<Endpoint>> subscriptionEndpointMap; // board name : <Endpoint>
 
 	/**
-	 * Endpoint id map to remote boards, for clean-ups upon endpoint closure.
+	 * Endpoint id map: id to remote boards, for clean-ups upon endpoint closure.
 	 */
 	Map<String, ArrayList<String>> remoteBoardMap; // endpoint id : <board name>
 
 	/**
 	 * Initialize the white board app.
 	 */
-	public WhiteboardApp(int peerPort, String whiteboardServerHost,
-			int whiteboardServerPort) throws UnknownHostException, InterruptedException {
+	public WhiteboardApp(int peerPort, String indexServerHost, int indexServerPort) {
 		this.whiteboards = new ConcurrentHashMap<>();
 		this.subscriptionEndpointMap = new ConcurrentHashMap<>();
 		this.remoteBoardMap = new ConcurrentHashMap<>();
+		this.indexServerHost = indexServerHost;
+		this.indexServerPort = indexServerPort;
 		startPeerServer(peerPort);
-		connectToIndexServer(whiteboardServerHost, whiteboardServerPort);
 	}
 
 	/**
@@ -226,6 +230,13 @@ public class WhiteboardApp {
 			serverManager.on(IOThread.ioThread, (args2)->{
 				this.peerPort = (String) args2[0];
 				show(this.peerPort);
+				// connect to index server
+				try {
+					connectToIndexServer(this.indexServerHost, this.indexServerPort);
+				} catch (InterruptedException | UnknownHostException ignored) {
+					// I looked up the source, these exceptions will never be thrown...
+				}
+				// start heartbeat
 				startHeartbeat();
 			});
 		}).on(PeerManager.peerStarted, (args)-> {
@@ -345,7 +356,9 @@ public class WhiteboardApp {
 					deleteBoard(boardName);
 					log.info("Board removed by index server: " + boardName);
 				} // since this call could (very likely) be a redundancy, we should tolerate this
-            });
+            }).on(WhiteboardServer.error, (args1 -> {
+            	log.warning("Error from index server: " + args1[0]);
+			}));
 			for (Whiteboard w : whiteboards.values()) {
 				if (!w.isRemote() && w.isShared()) {
 					setShareToServer(w, true);
@@ -413,7 +426,6 @@ public class WhiteboardApp {
 				endpoint.close();
 			});
 			clientManager.start();
-
 		} catch (UnknownHostException | InterruptedException ignored) {}
 	}
 
@@ -423,6 +435,9 @@ public class WhiteboardApp {
 
 	// From whiteboard peer
 
+	/**
+	 * Basically push all boards to their subscribers every 5 seconds.
+	 */
 	private void startHeartbeat() {
 		Utils.getInstance().setTimeout(() -> {
 			if (!subscriptionEndpointMap.isEmpty()) {
@@ -433,6 +448,14 @@ public class WhiteboardApp {
 		}, 5000);
 	}
 
+	private void broadcastChanges(Whiteboard whiteboard) {
+		if (subscriptionEndpointMap.containsKey(whiteboard.getName())) {
+			for (Endpoint e: subscriptionEndpointMap.get(whiteboard.getName())) {
+				e.emit(boardData, whiteboard.toString());
+				log.info("Board " + whiteboard.getName() + " sent to: " + e.getOtherEndpointId());
+			}
+		}
+	}
 	private void acceptRemoteBoard(String boardData, Endpoint endpoint, boolean override) {
 		String name = getBoardName(boardData);
 		String data = getBoardData(boardData);
@@ -453,15 +476,6 @@ public class WhiteboardApp {
 			log.info((override?"Overriding board received: ":"Board received: ") + whiteboard.getName());
 		}
 	}
-
-    private void broadcastChanges(Whiteboard whiteboard) {
-		if (subscriptionEndpointMap.containsKey(whiteboard.getName())) {
-			for (Endpoint e: subscriptionEndpointMap.get(whiteboard.getName())) {
-				e.emit(boardData, whiteboard.toString());
-				log.info("Board " + whiteboard.getName() + " sent to: " + e.getOtherEndpointId());
-			}
-		}
-    }
 
     private void setShareToServer(Whiteboard whiteboard, Boolean share) {
 		if (serverEndpoint != null) {
@@ -586,7 +600,9 @@ public class WhiteboardApp {
 	 * Wait for the peer manager to finish all threads.
 	 */
 	public void waitToFinish() throws InterruptedException {
-		serverClientManager.join();
+		if (serverClientManager != null) {
+			serverClientManager.join();
+		}
 		peerManager.joinWithClientManagers();
 	}
 	
@@ -650,7 +666,7 @@ public class WhiteboardApp {
 					// some other peer modified the board in between
 					drawSelectedWhiteboard(); // just redraw the screen without the path
 				} else {
-					// was accepted locally, so do remote stuff if needed
+					// was accepted locally, so push to subscribers
 					broadcastChanges(selectedBoard);
 				}
 			}
@@ -659,13 +675,21 @@ public class WhiteboardApp {
 		}
 	}
 
+	/**
+	 * Invoked by remote path creating request. Try to accept and push to subscribers.
+	 * @param path path
+	 * @param board board
+	 * @param remoteVersion version
+	 * @return success or not
+	 */
 	public boolean pathCreatedRemotely(WhiteboardPath path, Whiteboard board, long remoteVersion) {
 		if(board != null) {
+			// well you cannot remotely change a remote board...
 			if(board.isRemote() || !board.addPath(path, remoteVersion)) {
 				log.info("Remote path rejected on " + board.getName() + ": " + path);
 				return false;
 			} else {
-				// was accepted locally, so do remote stuff if needed
+				// was accepted locally, so push to subscribers
 				drawSelectedWhiteboard();
 				log.info("Remote path accepted: " + path);
 				broadcastChanges(board);
@@ -691,7 +715,7 @@ public class WhiteboardApp {
 					// some other peer modified the board in between
 					drawSelectedWhiteboard();
 				} else {
-					// was accepted locally, so do remote stuff if needed
+					// was accepted locally, so push to subscribers
 					drawSelectedWhiteboard();
 					broadcastChanges(selectedBoard);
 				}
@@ -701,15 +725,22 @@ public class WhiteboardApp {
 		}
 	}
 
+	/**
+	 * Invoked by remote clear request. Try to accept and push to subscribers.
+	 * @param board board
+	 * @param remoteVersion version
+	 * @return success or not
+	 */
 	public boolean clearedRemotely(Whiteboard board, long remoteVersion) {
 		if(board!=null) {
-			if(!board.clear(remoteVersion)) {
+			// well you cannot remotely change a remote board...
+			if(board.isRemote() || !board.clear(remoteVersion)) {
 				// some other peer modified the board in between
 				log.info("Remote clear rejected on " + board.getName());
 				drawSelectedWhiteboard();
 				return false;
 			} else {
-				// was accepted locally, so do remote stuff if needed
+				// was accepted locally, so push to subscribers
 				drawSelectedWhiteboard();
 				broadcastChanges(board);
 				log.info("Remote clear accepted on " + board.getName());
@@ -735,6 +766,7 @@ public class WhiteboardApp {
 					// some other peer modified the board in between
 					drawSelectedWhiteboard();
 				} else {
+					// was accepted locally, so push to subscribers
 					drawSelectedWhiteboard();
 					broadcastChanges(selectedBoard);
 				}
@@ -744,13 +776,21 @@ public class WhiteboardApp {
 		}
 	}
 
+	/**
+	 * Invoked by remote undo request. Try to accept and push to subscribers.
+	 * @param board board
+	 * @param remoteVersion version
+	 * @return success or not
+	 */
 	public boolean undoRemotely(Whiteboard board, long remoteVersion) {
 		if(board!=null) {
-			if(!board.undo(remoteVersion)) {
+			// well you cannot remotely change a remote board...
+			if(board.isRemote() || !board.undo(remoteVersion)) {
 				// some other peer modified the board in between
 				log.info("Remote undo rejected on " + board.getName());
 				return false;
 			} else {
+				// was accepted locally, so push to subscribers
 				drawSelectedWhiteboard();
 				broadcastChanges(board);
 				log.info("Remote undo accepted on " + board.getName());
