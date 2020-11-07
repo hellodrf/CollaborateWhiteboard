@@ -217,6 +217,12 @@ public class WhiteboardApp {
 		this.indexServerHost = indexServerHost;
 		this.indexServerPort = indexServerPort;
 		startPeerServer(peerPort);
+		// connect to index server
+		try {
+			connectToIndexServer(this.indexServerHost, this.indexServerPort);
+		} catch (InterruptedException | UnknownHostException ignored) {
+			// I looked up the source, these exceptions will never be thrown...
+		}
 	}
 
 	/**
@@ -229,15 +235,8 @@ public class WhiteboardApp {
 			ServerManager serverManager = (ServerManager)args[0];
 			serverManager.on(IOThread.ioThread, (args2)->{
 				this.peerPort = (String) args2[0];
-				show(this.peerPort);
-				// connect to index server
-				try {
-					connectToIndexServer(this.indexServerHost, this.indexServerPort);
-				} catch (InterruptedException | UnknownHostException ignored) {
-					// I looked up the source, these exceptions will never be thrown...
-				}
-				// start heartbeat
 				startHeartbeat();
+				show(this.peerPort);
 			});
 		}).on(PeerManager.peerStarted, (args)-> {
 			Endpoint endpoint = (Endpoint) args[0];
@@ -356,9 +355,7 @@ public class WhiteboardApp {
 					deleteBoard(boardName);
 					log.info("Board removed by index server: " + boardName);
 				} // since this call could (very likely) be a redundancy, we should tolerate this
-            }).on(WhiteboardServer.error, (args1 -> {
-            	log.warning("Error from index server: " + args1[0]);
-			}));
+            }).on(WhiteboardServer.error, (args1 -> log.warning("Error from index server: " + args1[0])));
 			for (Whiteboard w : whiteboards.values()) {
 				if (!w.isRemote() && w.isShared()) {
 					setShareToServer(w, true);

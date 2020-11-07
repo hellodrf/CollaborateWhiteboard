@@ -80,11 +80,14 @@ public class WhiteboardServer {
 	 */
 	private static int port = Utils.indexServerPort;
 
-	private static final Map<String, String> whiteboards = new ConcurrentHashMap<>(); // board name : Whiteboard
+	/**
+	 * Maps containing various of relations
+	 */
+	private static final Map<String, String> whiteboards = new ConcurrentHashMap<>(); // board-name TO Whiteboard
 
-	private static final Map<String, Endpoint> peers = new ConcurrentHashMap<>(); // peer address : Endpoint
+	private static final Map<String, Endpoint> peers = new ConcurrentHashMap<>(); // peer-address TO Endpoint
 
-	private static final Map<String, String> peersPortMap = new ConcurrentHashMap<>();
+	private static final Map<String, String> peersPortMap = new ConcurrentHashMap<>(); // peer-server TO peer-client
 
 	
 	private static void help(Options options){

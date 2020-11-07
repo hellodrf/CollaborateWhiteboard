@@ -34,7 +34,7 @@ public class ServerManager extends Manager implements ISessionProtocolHandler,
 {
 	private static Logger log = Logger.getLogger(ServerManager.class.getName());
 	
-	/**
+	/*
 	 * Events emitted by the ServerManager
 	 */
 	
@@ -231,9 +231,7 @@ public class ServerManager extends Manager implements ISessionProtocolHandler,
 		// abrupt disconnection
 		if(vaderShutdown) {
 			// let's just close everything
-			currentEndpoints.forEach((endpoint)->{
-				endpoint.close();
-			});
+			currentEndpoints.forEach(Endpoint::close);
 		}
 		
 		// let's wait for the remaining clients if we can
@@ -254,9 +252,7 @@ public class ServerManager extends Manager implements ISessionProtocolHandler,
 				synchronized(liveEndpoints) {
 					currentEndpoints = new HashSet<>(liveEndpoints);
 				}
-				currentEndpoints.forEach((endpoint)->{
-						endpoint.close();
-				});
+				currentEndpoints.forEach(Endpoint::close);
 			}
 		}
 		log.info("terminated");
